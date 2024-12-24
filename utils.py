@@ -5,6 +5,9 @@ from PIL import Image
 import cv2
 import numpy as np
 import open3d as o3d
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 model_type = "DPT_Large"
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -60,4 +63,19 @@ def generate_point_cloud(depth_map, intrinsic_matrix):
 def visualize_point_cloud(points):
     point_cloud_o3d = o3d.geometry.PointCloud()
     point_cloud_o3d.points = o3d.utility.Vector3dVector(points)
-    o3d.visualization.draw_geometries([point_cloud_o3d])
+    
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    vis.add_geometry(point_cloud_o3d)
+    view_control = vis.get_view_control()
+    view_control.set_zoom(0.8)  # 줌 조정
+    view_control.set_lookat([0, 0, 0])  # 카메라가 바라보는 중심 설정
+    
+    vis.run()
+    vis.destroy_window()
+
+def visualize_point_cloud_with_matplotlib(points):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.1)
+    plt.show()
