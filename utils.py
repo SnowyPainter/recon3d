@@ -50,6 +50,21 @@ def create_intrinsic_matrix(depth_map, focal_length):
     ])
     return intrinsic_matrix
 
+def preprocess_point_cloud(points, method="normalize"):
+    points = np.asarray(points)
+    
+    if method == "normalize":
+        min_vals = points.min(axis=0)
+        max_vals = points.max(axis=0)
+        return (points - min_vals) / (max_vals - min_vals)
+    elif method == "standardize":
+        mean_vals = points.mean(axis=0)
+        std_vals = points.std(axis=0)
+        return (points - mean_vals) / std_vals
+    
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
 def generate_point_cloud(depth_map, intrinsic_matrix):
     h, w = depth_map.shape
     i, j = np.meshgrid(np.arange(w), np.arange(h), indexing="xy")
@@ -61,21 +76,30 @@ def generate_point_cloud(depth_map, intrinsic_matrix):
     return points
 
 def visualize_point_cloud(points):
+    points = np.asarray(points)
     point_cloud_o3d = o3d.geometry.PointCloud()
     point_cloud_o3d.points = o3d.utility.Vector3dVector(points)
-    
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(point_cloud_o3d)
-    view_control = vis.get_view_control()
-    view_control.set_zoom(0.8)  # 줌 조정
-    view_control.set_lookat([0, 0, 0])  # 카메라가 바라보는 중심 설정
-    
-    vis.run()
-    vis.destroy_window()
+    o3d.visualization.draw_geometries([point_cloud_o3d])
 
 def visualize_point_cloud_with_matplotlib(points):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.1)
     plt.show()
+
+def visualize_point_cloud_with_texture(points, image_path):
+    points = np.asarray(points)
+    point_cloud_o3d = o3d.geometry.PointCloud()
+    point_cloud_o3d.points = o3d.utility.Vector3dVector(points)
+    image = Image.open(image_path)
+    image_width, image_height = image.size
+    texture = np.asarray(image) / 255.0
+    uvs = np.column_stack((np.linspace(0, 1, points.shape[0]), np.linspace(0, 1, points.shape[0])))
+    texture_colors = np.zeros((points.shape[0], 3))
+    for i, (u, v) in enumerate(uvs):
+        pixel_x = int(u * (image_width - 1))
+        pixel_y = int(v * (image_height - 1))
+        texture_colors[i] = texture[pixel_y, pixel_x]
+
+    point_cloud_o3d.colors = o3d.utility.Vector3dVector(texture_colors)
+    o3d.visualization.draw_geometries([point_cloud_o3d])
