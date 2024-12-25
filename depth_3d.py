@@ -1,6 +1,6 @@
 import utils
 
-image_path = "./resource/3dimage1.jpg"
+image_path = "./resource/struct1.jpg"
 depth_map = utils.estimate_depth(image_path)
 im = utils.create_intrinsic_matrix(depth_map, 1.0)
 point_cloud = utils.generate_point_cloud(depth_map, im)
