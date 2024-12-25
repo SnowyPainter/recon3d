@@ -51,6 +51,10 @@ def create_intrinsic_matrix(depth_map, focal_length):
     return intrinsic_matrix
 
 def preprocess_point_cloud(points, method="normalize"):
+    points = points[
+        (points[:, 2] > 0) &
+        (np.abs(points) < 1e4).all(axis=1)
+    ]
     points = np.asarray(points)
     
     if method == "normalize":
