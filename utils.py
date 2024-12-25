@@ -88,18 +88,25 @@ def visualize_point_cloud_with_matplotlib(points):
     plt.show()
 
 def visualize_point_cloud_with_texture(points, image_path):
-    points = np.asarray(points)
-    point_cloud_o3d = o3d.geometry.PointCloud()
-    point_cloud_o3d.points = o3d.utility.Vector3dVector(points)
-    image = Image.open(image_path)
-    image_width, image_height = image.size
-    texture = np.asarray(image) / 255.0
-    uvs = np.column_stack((np.linspace(0, 1, points.shape[0]), np.linspace(0, 1, points.shape[0])))
-    texture_colors = np.zeros((points.shape[0], 3))
-    for i, (u, v) in enumerate(uvs):
-        pixel_x = int(u * (image_width - 1))
-        pixel_y = int(v * (image_height - 1))
-        texture_colors[i] = texture[pixel_y, pixel_x]
-
-    point_cloud_o3d.colors = o3d.utility.Vector3dVector(texture_colors)
-    o3d.visualization.draw_geometries([point_cloud_o3d])
+    image = Image.open(image_path).convert('RGB')
+    colors = np.asarray(image) / 255.0
+    colors = colors.reshape(-1, 3)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    n_points = len(points)
+    n_colors = len(colors)
+    if n_points > n_colors:
+        colors = np.pad(colors, ((0, n_points - n_colors), (0, 0)), mode='edge')
+    else:
+        colors = colors[:n_points]
+    
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    del colors
+    o3d.visualization.draw_geometries([pcd],
+                                    window_name='Point Cloud Visualization',
+                                    width=1024,
+                                    height=768,
+                                    left=50,
+                                    top=50)
+    
+    return pcd
