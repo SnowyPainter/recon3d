@@ -152,3 +152,13 @@ def flatten_to_two_levels(points, threshold_ratio=0.1):
         new_points[high_indices, 2] = min_high_z
 
     return new_points
+
+def visualize_z_change_scatter(points):
+    x = points[:, 0]
+    z = points[:, 2]
+
+    plt.scatter(x, z, s=1)
+    plt.xlabel('X')
+    plt.ylabel('Z')
+    plt.title('Z Value Change Scatter Plot')
+    plt.show()
