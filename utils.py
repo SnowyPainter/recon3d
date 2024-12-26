@@ -5,9 +5,10 @@ from PIL import Image
 import cv2
 import numpy as np
 import open3d as o3d
+from sklearn.cluster import DBSCAN
+from scipy.ndimage import gaussian_gradient_magnitude, gaussian_filter
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
 
 model_type = "DPT_Large"
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -55,6 +56,7 @@ def preprocess_point_cloud(points, method="normalize"):
         (points[:, 2] > 0) &
         (np.abs(points) < 1e4).all(axis=1)
     ]
+
     points = np.asarray(points)
     
     if method == "normalize":
@@ -67,7 +69,7 @@ def preprocess_point_cloud(points, method="normalize"):
         return (points - mean_vals) / std_vals
     
     else:
-        raise ValueError(f"Unknown method: {method}")
+        return points
 
 def generate_point_cloud(depth_map, intrinsic_matrix):
     h, w = depth_map.shape
@@ -114,3 +116,39 @@ def visualize_point_cloud_with_texture(points, image_path):
                                     top=50)
     
     return pcd
+
+def flatten_to_two_levels(points, threshold_ratio=0.1):
+    """높이를 두 개의 레벨로 평탄화합니다 (중간 높이 유지, 층 연결)."""
+    z_values = points[:, 2]
+    z_min = np.min(z_values)
+    z_max = np.max(z_values)
+    z_range = z_max - z_min
+
+    if z_range == 0:  # 모든 z 값이 동일한 경우 처리
+        return points
+
+    # 임계값 계산
+    lower_threshold = z_min + z_range * threshold_ratio
+    upper_threshold = z_max - z_range * threshold_ratio
+
+    new_points = points.copy()
+
+    # 가장 낮은 층에 속하는 포인트들을 추출
+    low_indices = z_values <= lower_threshold
+    low_points = points[low_indices]
+
+    # 가장 높은 층에 속하는 포인트들을 추출
+    high_indices = z_values >= upper_threshold
+    high_points = points[high_indices]
+
+    # 낮은 층이 존재할 경우, 해당 층의 최대 높이로 평탄화
+    if len(low_points) > 0:
+        max_low_z = np.max(low_points[:, 2])
+        new_points[low_indices, 2] = max_low_z
+
+    # 높은 층이 존재할 경우, 해당 층의 최소 높이로 평탄화
+    if len(high_points) > 0:
+        min_high_z = np.min(high_points[:, 2])
+        new_points[high_indices, 2] = min_high_z
+
+    return new_points
