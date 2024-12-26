@@ -93,6 +93,43 @@ def visualize_point_cloud_with_matplotlib(points):
     ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.1)
     plt.show()
 
+def create_lines(pcd):
+    bbox = pcd.get_axis_aligned_bounding_box()
+    min_bound = bbox.get_min_bound()
+    max_bound = bbox.get_max_bound()
+    center = (min_bound + max_bound) / 2
+    corners = [
+        min_bound,  # 0
+        [max_bound[0], min_bound[1], min_bound[2]],  # 1
+        [max_bound[0], max_bound[1], min_bound[2]],  # 2
+        [min_bound[0], max_bound[1], min_bound[2]],  # 3
+        [min_bound[0], min_bound[1], max_bound[2]],  # 4
+        [max_bound[0], min_bound[1], max_bound[2]],  # 5
+        max_bound,  # 6
+        [min_bound[0], max_bound[1], max_bound[2]]   # 7
+    ]
+
+    edges = [
+        [0, 1], [1, 2], [2, 3], [3, 0],
+        [4, 5], [5, 6], [6, 7], [7, 4],
+        [0, 4], [1, 5], [2, 6], [3, 7]
+    ]
+    center_lines = [
+        [np.array([min_bound[0], center[1], center[2]]), np.array([max_bound[0], center[1], center[2]])],
+        [np.array([center[0], min_bound[1], center[2]]), np.array([center[0], max_bound[1], center[2]])],
+        [np.array([center[0], center[1], min_bound[2]]), np.array([center[0], center[1], max_bound[2]])],
+    ] 
+    
+    lines = []
+    for edge in edges:
+        lines.append([corners[edge[0]], corners[edge[1]]])
+    lines.extend(center_lines)
+
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(np.array([p for line in lines for p in line]))
+    line_set.lines = o3d.utility.Vector2iVector(np.array([[i, i + 1] for i in range(0, len(lines) * 2, 2)], dtype=np.int32))
+    return line_set
+
 def visualize_point_cloud_with_texture(points, image_path):
     image = Image.open(image_path).convert('RGB')
     colors = np.asarray(image) / 255.0
@@ -108,7 +145,7 @@ def visualize_point_cloud_with_texture(points, image_path):
     
     pcd.colors = o3d.utility.Vector3dVector(colors)
     del colors
-    o3d.visualization.draw_geometries([pcd],
+    o3d.visualization.draw_geometries([pcd, create_lines(pcd)],
                                     window_name='Point Cloud Visualization',
                                     width=1024,
                                     height=768,
