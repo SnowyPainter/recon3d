@@ -9,6 +9,7 @@ from sklearn.cluster import DBSCAN
 from scipy.ndimage import gaussian_gradient_magnitude, gaussian_filter
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import os, time, math
 
 model_type = "DPT_Large"
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -33,16 +34,33 @@ def estimate_depth(image_path):
     depth_map = prediction.cpu().numpy()
     return depth_map
 
-def visualize_depth_map(depth_map):
-    depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
-    depth_map_normalized = np.uint8(depth_map_normalized)
-    depth_map_colored = cv2.applyColorMap(depth_map_normalized, cv2.COLORMAP_MAGMA)
-    cv2.imshow("Depth Map", depth_map_colored)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+def visualize_depth(depth_map, image_path, save_dir=""):
+    if depth_map is None:
+        return
 
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+
+    # 원본 이미지 표시
+    original_image = cv2.imread(image_path)
+    original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+    axes[0].imshow(original_image)
+    axes[0].set_title("Original Image")
+    axes[0].axis('off')
+    im = axes[1].imshow(depth_map, cmap='viridis')
+    axes[1].set_title("Depth Map")
+    axes[1].axis('off')
+    cbar = fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
+    cbar.set_label('Depth', rotation=270, labelpad=15)
+
+    plt.tight_layout()
+    if save_dir == "":
+        plt.show()
+    else:
+        plt.savefig(os.path.join(save_dir, "depthmap.png"))
+        plt.close()
+    
 def create_intrinsic_matrix(depth_map, focal_length):
-    focal_length = 1.0  # 예제 값
+    focal_length = 1.0
     center = (depth_map.shape[1] / 2, depth_map.shape[0] / 2)
     intrinsic_matrix = np.array([
         [focal_length, 0, center[0]],
@@ -130,12 +148,14 @@ def create_lines(pcd):
     line_set.lines = o3d.utility.Vector2iVector(np.array([[i, i + 1] for i in range(0, len(lines) * 2, 2)], dtype=np.int32))
     return line_set
 
-def visualize_point_cloud_with_texture(points, image_path):
+def visualize_point_cloud_with_texture(points, image_path, save_dir=""):
     image = Image.open(image_path).convert('RGB')
     colors = np.asarray(image) / 255.0
     colors = colors.reshape(-1, 3)
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
+    line_set = create_lines(pcd)
+
     n_points = len(points)
     n_colors = len(colors)
     if n_points > n_colors:
@@ -145,13 +165,32 @@ def visualize_point_cloud_with_texture(points, image_path):
     
     pcd.colors = o3d.utility.Vector3dVector(colors)
     del colors
-    o3d.visualization.draw_geometries([pcd, create_lines(pcd)],
-                                    window_name='Point Cloud Visualization',
-                                    width=1024,
-                                    height=768,
-                                    left=50,
-                                    top=50)
-    
+
+    if save_dir == "":
+        o3d.visualization.draw_geometries([pcd, line_set],
+                                        window_name='Point Cloud Visualization',
+                                        width=1024,
+                                        height=768,
+                                        left=50,
+                                        top=50)
+    else:
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(width=800, height=600, visible=False)
+        time.sleep(0.1)
+
+        vis.add_geometry(pcd)
+        vis.add_geometry(line_set)
+        ctr = vis.get_view_control()
+        ctr.rotate(0, -400)
+
+        vis.update_geometry(pcd)
+        vis.update_geometry(line_set)
+        vis.poll_events()
+        vis.update_renderer()
+        time.sleep(1)
+        vis.capture_screen_image(os.path.join(save_dir, 'pcd3d.png'), do_render=True)
+        
+        vis.destroy_window()
     return pcd
 
 def flatten_to_two_levels(points, threshold_ratio=0.1):
@@ -190,7 +229,7 @@ def flatten_to_two_levels(points, threshold_ratio=0.1):
 
     return new_points
 
-def visualize_z_change_scatter(points):
+def visualize_z_change_scatter(points, save_dir=""):
     x = points[:, 0]
     z = points[:, 2]
 
@@ -198,4 +237,8 @@ def visualize_z_change_scatter(points):
     plt.xlabel('X')
     plt.ylabel('Z')
     plt.title('Z Value Change Scatter Plot')
-    plt.show()
+    if save_dir == "":
+        plt.show()
+    else:
+        plt.savefig(os.path.join(save_dir, "pcd_xz_scatter.png"))
+        plt.close()
